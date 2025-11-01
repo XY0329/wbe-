@@ -460,7 +460,7 @@ function showCenterThenExit() {
   center.style.pointerEvents = 'none';
 
   const img = document.createElement('img');
-  img.src = (imageCache[0] && imageCache[0].src) || (imageCache[randInt(0,imageCache.length-1)].src);
+  img.src = imageCache[randInt(0,imageCache.length-1)].src;
   center.appendChild(img);
 
   const text = document.createElement('div');
@@ -593,3 +593,4 @@ progressWrap.addEventListener('click', e => {
 </script>
 </body>
 </html>
+
