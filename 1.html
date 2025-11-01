@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>木子日青</title>
+<style>
+  :root {
+    --popup-size: 260px;
+    --max-windows: 120;
+    --title-bg: rgba(255,255,255,0.9);
+    --title-color: deeppink;
+    --font-main: "微软雅黑", "Microsoft YaHei", sans-serif;
+  }
+  body { margin:0; font-family: var(--font-main); overflow:hidden; background:#111; color:#eee; }
+  #controls {
+    position: fixed; left: 12px; top: 12px; z-index: 99999; background: rgba(0,0,0,0.45);
+    padding:10px; border-radius:8px; backdrop-filter: blur(4px);
+  }
+  #controls button, #controls input { margin:4px; }
+  #progressWrap { margin-top:6px; display:flex; align-items:center; gap:8px; }
+  #progress { width:300px; height:10px; background:#333; border-radius:6px; overflow:hidden; cursor:pointer; }
+  #progress > i { display:block; height:100%; width:0%; background:linear-gradient(90deg,#ff7ab6,#ffd36e); pointer-events:none; }
+  .popup {
+    position: fixed;
+    border-radius: 6px;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.6);
+    transform-origin: center center;
+    opacity: 0;
+    transition: opacity 300ms ease, transform 300ms ease;
+    z-index: 9990;
+    background: #000;
+  }
+  .popup img { display:block; width:100%; height:100%; object-fit:cover; }
+  .popup .title {
+    position:absolute; left:0; top:0; right:0; padding:6px; text-align:center;
+    font-weight:700; font-size:12px; color:var(--title-color); background:var(--title-bg);
+  }
+  .centerStage {
+    position: fixed; left:50%; top:50%; transform: translate(-50%,-50%); z-index: 100000;
+    display:flex; align-items:center; justify-content:center; flex-direction:column;
+    pointer-events:none;
+  }
+  .centerStage img { max-width:60vw; max-height:60vh; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,0.7); }
+  .centerStage .text {
+    margin-top:18px; font-size:42px; font-weight:800; color:deeppink; text-shadow:0 6px 20px rgba(0,0,0,0.6);
+  }
+  .f-in { opacity:1; transform: scale(1); }
+  .f-out { opacity:0; transform: scale(0.9); transition: opacity 500ms ease, transform 500ms ease; }
+  .heart-popup { width:120px !important; height:120px !important; border-radius:8px; }
+  @media (max-width:600px){
+    #progress { width:160px; }
+    .centerStage .text { font-size:28px; }
+  }
+</style>
+</head>
+<body>
+  <h2>点击下面按钮开始播放</h2>
+  <button onclick="playAudio()">播放音频</button>
+
+  <audio id="myAudio" src="你的音频文件.mp3"></audio>
+
+  <script>
+    function playAudio() {
+      const audio = document.getElementById("myAudio");
+      audio.play();
+    }
+  </script>
+
+<div id="controls">
+  <div>
+    <button id="startBtn">▶️ 开始（需要用户交互以启动音频）</button>
+    <button id="toggleBtn">⏸ 暂停/继续（Space）</button>
+    <button id="stopBtn">⏹ 停止（Escape）</button>
+  </div>
+  <div id="progressWrap">
+    <div id="progress"><i></i></div>
+    <div id="timeLabel">00:00 / 00:00</div>
+  </div>
+  <div style="font-size:12px;opacity:0.8;margin-top:6px;">
+    Tip: 在浏览器中首次播放需要点击“开始”。Space：暂停/继续，Escape：立即停止。
+  </div>
+</div>
+
+<div id="container"></div>
+
+<script>
+/* ========== 配置区（改这几项） ========== */
+const IMAGE_URLS = [
+  "images/01efe2424f0b190bff350d9f909b8619.jpg",
+  "images/03f9d2a8d3bca9ca2b5eed976f04122f.jpg",
+  "images/059b69029a098929d9c7a0926ffec3fb.jpg",
+  "images/065989689985e5e44585bf3f86550ed3.jpg",
+  "images/09fa68d0b05fed696dadac6502bd18a1.jpg",
+  "images/0ca47553039b2e6e5f42a7e9b9a0abc2.jpg",
+  "images/0d95f921e85d800202a85671da0eaf4b.jpg",
+  "images/0dea0d8b71c119be230f90ae326aef9f.jpg",
+  "images/1.jpg",
+  "images/10.jpg",
+  "images/12bfbbacd5b1dd11ae2738b5a6e77386.jpg",
+  "images/18c29a96c9e50a243a56d96aba91d4b1.jpg",
+  "images/1cc1fc70d726193a842a2fa843b5e461.jpg",
+  "images/1e92a1a560696b7f5c0941165bdc04b6.jpg",
+  "images/2.jpg",
+  "images/250bba1113ac9c2220432cdea41e1a6f.jpg",
+  "images/2b8521ae9c32a17de70e93d5e94ba440.jpg",
+  "images/2c903d43027aa9369de20c4b367131e0.jpg",
+  "images/3.jpg",
+  "images/37d6a0bcde54c82ab0ad65ddcd28fc98.jpg",
+  "images/3c2427395aeaafd171f71882217ec78a.jpg",
+  "images/3eec88ba85b470d2630bf935379abd0f.jpg",
+  "images/3fabf9e7b20f9d885b0ba5d49e227e77.jpg",
+  "images/4.jpg",
+  "images/44260d019ff111f52f62130bff2e9510.jpg",
+  "images/4930e94d173cd7dce995291e61f4ec80.jpg",
+  "images/4b7f2a4e1212922d6e70e745e9e3a6d3.jpg",
+  "images/4d0d30ef7dc705d79c0b02ba64ce52d8.jpg",
+  "images/4e3b4aa72abc0dcfbfe2981e69c32913.jpg",
+  "images/5.jpg",
+  "images/504550fc9a65910e8993bcdea32b6ac7.jpg",
+  "images/50499ab3c818136b33d507a8163c3a2a.jpg",
+  "images/50e27d69440d48a94921aeded8f9927e.jpg",
+  "images/5151f7df5cdebbcd14679e7f02c5f00f.jpg",
+  "images/56aeb9fd072203ae73968ffd8a3aea5f.jpg",
+  "images/57b48f6b1e4d42081683a1874e63e6d3.jpg",
+  "images/5a402e9c987043db5566d303980ad9ba.jpg",
+  "images/5b4afb18d9a1bce966a9f641750e8775.jpg",
+  "images/5e13f5ad1696d1885d250964541a9107.jpg",
+  "images/5e8a645e4c3b9b496e64566c5fe62d67.jpg",
+  "images/6.jpg",
+  "images/62480213019d1d2b1818d57ad8ab9ade.jpg",
+  "images/6806b9be3df3ad9fc37bd759a8d4a887.jpg",
+  "images/68376eb093e6075bbe21fd25d1dd2880.jpg",
+  "images/6b811332969c0df28877350bd8208853.jpg",
+  "images/6d4d99ba8045731ccecb2e3c4c20f02f.jpg",
+  "images/6f90ebeba1b51c09d50007fed0f90646.jpg",
+  "images/7.jpg",
+  "images/704e6b4ed96c91bbccbf300f3e9c1f4f.jpg",
+  "images/717facc8b514535fdc2ce7538d5c6236.jpg",
+  "images/7395e78f87d8d0a5f4b2e9d6d6a99df0.jpg",
+  "images/769213b06350c30704b5d399c6982233.jpg",
+  "images/78143f43093581bbb655e0d6d1f710e5.jpg",
+  "images/783815750958f6069c197502fa27e5b7.jpg",
+  "images/7a6c2c3f44136b0751250cf25ecf4325.jpg",
+  "images/7a7bebfff552b46bc2039b1ee9f3d7ae.jpg",
+  "images/7b61c55b19b15715181b5c6bb88c2f12.jpg",
+  "images/7bed22863b3037247f2bc26a7cd016d3.jpg",
+  "images/8.jpg",
+  "images/874da0831759b019b5468d4cca9c00a4.jpg",
+  "images/880803e4af75da82d5814bbb856817a6.jpg",
+  "images/8a0020e8405df681760e9a989035217b.jpg",
+  "images/8f13dc48636b2fae6da8ec62240b8285.jpg",
+  "images/9.jpg",
+  "images/91091dc090345c83b458d202b6cf8d8b.jpg",
+  "images/93577630baf9a8317ded5425f9d332a0.jpg",
+  "images/955c6de807ed135b42216873a6ff5ded.jpg",
+  "images/95d49208218f8f5094afb157d5bc0d73.jpg",
+  "images/98f26d06c87f0b093ea7755084e0d13c.jpg",
+  "images/997dff56a9398c362d0536d582069f05.jpg",
+  "images/9b8c024f1b2581068e64ccc0bf58f47d.jpg",
+  "images/a354162f1fe07eff2483405895a10a83.jpg",
+  "images/a5e9260a2d79160f6b58e681e177dc54.jpg",
+  "images/a69feafd14ad0fe1af401b95dfccb89e.jpg",
+  "images/aa3d4de0acfb8af02bc015c4f2155810.jpg",
+  "images/af893480abae89c6cbd60280ec490ea4.jpg",
+  "images/b155850734150a0102239af1e284a062.jpg",
+  "images/b4d14af73359409694311e5b2369660f.jpg",
+  "images/b9ffbf439b3d60147312aea1a4ed11ff.jpg",
+  "images/bc59638fa493936df12583ce12daf13a.jpg",
+  "images/bc8a9af99e9544e40e5da56f5cc263ab.jpg",
+  "images/bd17a53477fca2d564b5d5a027a6e805.jpg",
+  "images/bda9e3e9606e1572dbae2faac7585178.jpg",
+  "images/bed499046484b76454890dc90ef7f80a.jpg",
+  "images/beijing.jpg",
+  "images/c01fc3324af00e6c3a8b1f7e2ae59957.jpg",
+  "images/c0aee29f0cef0ae3763a202283320f00.jpg",
+  "images/c0c43bb7adaa6459b5b470c5088503b3.jpg",
+  "images/c0cfbe090c13b905b995c3cc87890218.jpg",
+  "images/c17ec2d098a4f0c072456b27ee43ab20.jpg",
+  "images/c28938cd8822842fde86f1639103251a.jpg",
+  "images/c54c354fd04da3a5c401d1d793a3d4cb.jpg",
+  "images/cd6d97940f7710dc335b6b4fc18ab045.jpg",
+  "images/d129ffefab79ba001a13faa62defff4f.jpg",
+  "images/d1355da6b06baa278378dde6e0959e4f.jpg",
+  "images/d2a96bd18e731167b7335c3c6ef5ae30.jpg",
+  "images/d3bd3901b8564a83077def9b4922cc12.jpg",
+  "images/d3f474f865df4cdf18884a8f33f77466.jpg",
+  "images/d68e655897e4def04e44db8e2425f96e.jpg",
+  "images/e3b931498a6e7f92093087ae19834a11.jpg",
+  "images/e537fe2452aabaa92460ca2b968c84bd.jpg",
+  "images/e68a16c51fcb155ce4ff20a4e816b645.jpg",
+  "images/f6f3c1da547bbb9de72e5ba03e45f07c.jpg",
+  "images/f766aa464d1629703099a0dd8b005c94.jpg",
+  "images/f7a4274ab14f96f532c179d6a866845e.jpg",
+];
+
+const MUSIC_URL = "music/1.mp3";
+const START_OFFSET = 0;
+
+let stages = [
+  { start: 0, end: 13, delay: 850 },
+  { start: 13, end: 66, delay: 850 },
+  { start: 66, end: 86, delay: 100 },
+  { start: 86, end: 106, delay: 300 },
+  { start: 106, end: 120, delay: 100 },
+  { start: 120, end: 146, delay: 1100 },
+  { start: 146, end: 173, delay: 850 },
+  { start: 173, end: 198, delay: 1100 },
+  { start: 198, end: 218, delay: 80 },
+  { start: 218, end: 238, delay: 300 },
+  { start: 238, end: 260, delay: 100 },
+  { start: 260, end: 296, delay: 1100 }
+];
+
+const GLOBAL_MAX_WINDOWS = 120;
+const DEFAULT_POPUP_W = 300;
+const DEFAULT_POPUP_H = 300;
+
+/* ========== 全局状态 ========== */
+let isRunning = false;
+let audio = null;
+let audioStarted = false;
+let musicPaused = false;
+let createdPopups = new Set();
+let spawnTimer = null;
+let burstDone = new Set();
+let finalTriggered = false;
+let popupTimeCache = new Set();
+
+/* ========== DOM refs ========== */
+const container = document.getElementById('container');
+const startBtn = document.getElementById('startBtn');
+const toggleBtn = document.getElementById('toggleBtn');
+const stopBtn = document.getElementById('stopBtn');
+const progressBarEl = document.querySelector('#progress > i');
+const timeLabel = document.getElementById('timeLabel');
+const progressWrap = document.getElementById('progress');
+
+/* ========== 资源预loading ========== */
+let imageCache = [];
+function preloadImages(urls) {
+  return Promise.all(urls.map(u => new Promise((res) => {
+    const img = new Image();
+    img.onload = () => { imageCache.push(img); res(img); };
+    img.onerror = () => { res(null); };
+    img.src = u;
+  })));
+}
+
+/* ========== 小工具 ========== */
+function randInt(min,max){ return Math.floor(Math.random()*(max-min+1))+min; }
+function formatTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+function getStageByTime(t) {
+  for (let s of stages) {
+    if (t >= s.start && t < s.end) return s;
+  }
+  return stages[stages.length-1];
+}
+
+/* ========== 弹窗（浮窗）创建/销毁 ========== */
+function createPopup({w=DEFAULT_POPUP_W,h=DEFAULT_POPUP_H,stay_ms=4000} = {}) {
+  if (createdPopups.size >= GLOBAL_MAX_WINDOWS) return null;
+  if (!imageCache.length) return null;
+
+  const popup = document.createElement('div');
+  popup.className = 'popup';
+  popup.style.width = w + 'px';
+  popup.style.height = h + 'px';
+  const vw = Math.max(window.innerWidth, 200);
+  const vh = Math.max(window.innerHeight, 200);
+  const x = randInt(0, Math.max(0, vw - w));
+  const y = randInt(0, Math.max(0, vh - h));
+  popup.style.left = x + 'px';
+  popup.style.top = y + 'px';
+
+  const img = document.createElement('img');
+  const choice = imageCache[randInt(0,imageCache.length-1)];
+  img.src = choice.src;
+  popup.appendChild(img);
+
+  const title = document.createElement('div');
+  title.className = 'title';
+  title.innerText = '✨ 木子日青 ✨';
+  popup.appendChild(title);
+
+  container.appendChild(popup);
+  requestAnimationFrame(()=> { popup.classList.add('f-in'); popup.style.opacity=1; popup.style.transform='scale(1)'; });
+
+  createdPopups.add(popup);
+
+  setTimeout(()=> {
+    popup.classList.remove('f-in');
+    popup.classList.add('f-out');
+    setTimeout(()=> {
+      try { container.removeChild(popup); } catch(e){}
+      createdPopups.delete(popup);
+    }, 600);
+  }, stay_ms);
+
+  return popup;
+}
+
+/* ========== burst（一次性爆发） ========== */
+function doBurst(count, per_stay=2000) {
+  const batch = 8;
+  let created=0;
+  function createBatch(){
+    for (let i=0;i<Math.min(batch, count-created);i++){
+      createPopup({w:260,h:260,stay_ms:per_stay});
+      created++;
+    }
+    if (created < count) setTimeout(createBatch, 70);
+  }
+  createBatch();
+}
+
+/* ========== spawn 调度器 ========== */
+function spawnScheduler() {
+  if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = null; }
+  if (!audioStarted || !isRunning || musicPaused) {
+    spawnTimer = setTimeout(spawnScheduler, 300);
+    return;
+  }
+
+  const elapsed = Math.max(0, audio.currentTime + START_OFFSET);
+  const currentStage = getStageByTime(elapsed);
+
+  if (currentStage.burst && !burstDone.has(currentStage)) {
+    const cnt = Math.min(currentStage.burst, GLOBAL_MAX_WINDOWS);
+    doBurst(cnt, currentStage.stay_ms || 2000);
+    burstDone.add(currentStage);
+  }
+
+  const spawnDelay = currentStage.delay || 300;
+  const stay_ms = currentStage.stay_ms || 4000;
+  const max_alive = currentStage.max_alive || 50;
+  if (isRunning && !musicPaused && createdPopups.size < max_alive) {
+    createPopup({w: currentStage.w || DEFAULT_POPUP_W, h: currentStage.h || DEFAULT_POPUP_H, stay_ms});
+  }
+  spawnTimer = setTimeout(spawnScheduler, spawnDelay);
+}
+
+/* ========== 监控音乐结束与尾声音量淡出 ========== */
+function monitorMusicAndHandle() {
+  if (!audio) return;
+  if (!audioStarted) { setTimeout(monitorMusicAndHandle, 300); return; }
+
+  const elapsed = audio.currentTime + START_OFFSET;
+  const lastStage = stages[stages.length-1];
+
+  if (elapsed >= lastStage.start) {
+    const total = Math.max(1.0, lastStage.end - lastStage.start);
+    const progress = Math.min((elapsed - lastStage.start) / total, 1.0);
+    audio.volume = Math.max(0, 1 - progress);
+  }
+
+  if (audio.ended && !finalTriggered) {
+    finalTriggered = true;
+    setTimeout(startFinalSequence, 3000);
+    return;
+  }
+
+  setTimeout(monitorMusicAndHandle, 300);
+}
+
+/* ========== 谢幕：心形 + 呼吸 + 中央图 + 退出 ========== */
+function startFinalSequence() {
+  isRunning = false;
+  if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = null; }
+
+  for (let p of Array.from(createdPopups)) {
+    try {
+      p.classList.remove('f-in'); p.classList.add('f-out');
+      setTimeout(()=> { try { container.removeChild(p); } catch(e){}; createdPopups.delete(p); }, 700);
+    } catch(e){}
+  }
+
+  if (!imageCache.length) {
+    finalizeExit();
+    return;
+  }
+  createHeartPopups();
+}
+
+function createHeartPopups() {
+  const scrW = window.innerWidth, scrH = window.innerHeight;
+  const num = 36;
+  const scale = Math.min(scrW, scrH) / 2;
+  const cx = scrW/2, cy = scrH/2 - 150;
+  const popups = [];
+
+  for (let i=0;i<num;i++){
+    const t = Math.PI - (2 * Math.PI / num) * i;
+    let x = 16 * Math.pow(Math.sin(t),3);
+    let y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+    x = cx + scale * x / 20 + randInt(-40,40);
+    y = cy - scale * y / 20 + randInt(-40,40);
+
+    const popup = document.createElement('div');
+    popup.className = 'popup heart-popup';
+    popup.style.left = (x|0) + 'px';
+    popup.style.top = (y|0) + 'px';
+    popup.style.width = '120px';
+    popup.style.height = '120px';
+    popup.style.zIndex = 20000;
+
+    const img = document.createElement('img');
+    img.src = imageCache[randInt(0,imageCache.length-1)].src;
+    popup.appendChild(img);
+    container.appendChild(popup);
+
+    requestAnimationFrame(()=>{ popup.classList.add('f-in'); popup.style.opacity=1; popup.style.transform='scale(1)'; });
+
+    popups.push(popup);
+  }
+
+  let step = 0, repeat = 3;
+  function breathe() {
+    if (step < repeat * 2) {
+      const scaleFactor = 1.0 + 0.08 * (step % 2 === 0 ? 1 : -1);
+      for (let p of popups) {
+        p.style.transform = `scale(${scaleFactor})`;
+      }
+      step++;
+      setTimeout(breathe, 420);
+      return;
+    }
+    for (let p of popups) {
+      p.classList.remove('f-in'); p.classList.add('f-out');
+      setTimeout(()=> { try { container.removeChild(p); } catch(e){}; }, 2500);
+    }
+    fadeOutMusic();
+    setTimeout(showCenterThenExit, 2500);
+  }
+  setTimeout(breathe, 1800);
+}
+
+function fadeOutMusic() {
+  if (!audio) return;
+  function stepFade() {
+    if (audio.volume > 0.02) {
+      audio.volume = Math.max(0, audio.volume - 0.02);
+      setTimeout(stepFade, 200);
+    } else {
+      try { audio.pause(); audio.currentTime = 0; } catch(e){}
+    }
+  }
+  stepFade();
+}
+
+function showCenterThenExit() {
+  const center = document.createElement('div');
+  center.className = 'centerStage';
+  center.style.zIndex = 30000;
+  center.style.pointerEvents = 'none';
+
+  const img = document.createElement('img');
+  img.src = (imageCache[0] && imageCache[0].src) || (imageCache[randInt(0,imageCache.length-1)].src);
+  center.appendChild(img);
+
+  const text = document.createElement('div');
+  text.className = 'text';
+  text.innerText = '💖 天天开心 💖';
+  center.appendChild(text);
+
+  document.body.appendChild(center);
+  center.style.opacity = '0';
+  center.style.transform = 'translate(-50%,-50%) scale(.96)';
+  requestAnimationFrame(()=> {
+    center.style.transition = 'opacity 600ms ease, transform 600ms ease';
+    center.style.opacity = '1'; center.style.transform = 'translate(-50%,-50%) scale(1)';
+  });
+
+  setTimeout(()=> {
+    center.style.opacity = '0'; center.style.transform = 'translate(-50%,-50%) scale(.94)';
+    setTimeout(()=> { try { document.body.removeChild(center); } catch(e){}; finalizeExit(); }, 1200);
+  }, 3000);
+}
+
+function finalizeExit() {
+  isRunning = false;
+  createdPopups.forEach(p => { try { p.remove(); } catch(e){}; });
+  createdPopups.clear();
+  if (audio) { try { audio.pause(); audio.currentTime = 0; } catch(e){}; }
+  const tip = document.createElement('div');
+  tip.style.position='fixed'; tip.style.left='50%'; tip.style.bottom='24px';
+  tip.style.transform='translateX(-50%)'; tip.style.background='rgba(0,0,0,0.6)';
+  tip.style.color='#fff'; tip.style.padding='10px 14px'; tip.style.borderRadius='10px';
+  tip.style.zIndex = 40000; tip.innerText = '演出结束 🎵';
+  document.body.appendChild(tip);
+  setTimeout(()=>{ try{ tip.remove(); } catch(e){} }, 3000);
+}
+
+/* ========== 进度条与时间更新 ========== */
+function updateProgress() {
+  if (!audio || !audioStarted) {
+    progressBarEl.style.width = '0%';
+    timeLabel.innerText = `00:00 / ${formatTime(stages[stages.length-1].end)}`;
+    requestAnimationFrame(updateProgress);
+    return;
+  }
+  const pos_s = audio.currentTime + START_OFFSET;
+  const total = stages[stages.length-1].end;
+  const rate = Math.min(1, pos_s / total);
+  progressBarEl.style.width = `${(rate*100).toFixed(2)}%`;
+  timeLabel.innerText = `${formatTime(pos_s)} / ${formatTime(total)}`;
+  requestAnimationFrame(updateProgress);
+}
+
+/* ========== 控制：开始 / 暂停 / 停止 ========== */
+function startAll() {
+  if (!MUSIC_URL) {
+    alert('请在 HTML 顶部将 MUSIC_URL 设为你的音频文件 URL（相对或绝对）。');
+    return;
+  }
+
+  if (!audio) {
+    audio = new Audio(MUSIC_URL);
+    audio.crossOrigin = "anonymous";
+    audio.preload = "auto";
+    audio.volume = 1.0;
+    audio.addEventListener('ended', ()=> { console.log('audio ended'); });
+  }
+
+  audio.currentTime = START_OFFSET;
+  audio.play().then(()=> {
+    audioStarted = true;
+    isRunning = true;
+    musicPaused = false;
+    spawnScheduler();
+    monitorMusicAndHandle();
+    updateProgress();
+    startBtn.disabled = true;
+  }).catch(err => {
+    console.error('播放失败：', err);
+    alert('播放失败：浏览器安全策略可能阻止自动播放，请确认已进行用户交互（点击开始）并且音频可访问。');
+  });
+}
+
+function toggleRunning() {
+  if (!audioStarted) return;
+  if (isRunning) {
+    isRunning = false;
+    musicPaused = true;
+    try { audio.pause(); } catch(e){}
+    toggleBtn.innerText = '▶️ 继续（Space）';
+  } else {
+    isRunning = true;
+    musicPaused = false;
+    try { audio.play(); } catch(e){}
+    toggleBtn.innerText = '⏸ 暂停/继续（Space）';
+    spawnScheduler();
+  }
+}
+
+function stopAll() {
+  isRunning = false;
+  if (spawnTimer) { clearTimeout(spawnTimer); spawnTimer = null; }
+  if (audio) { try { audio.pause(); audio.currentTime = 0; } catch(e){}; }
+  createdPopups.forEach(p => { try { p.remove(); } catch(e){}; });
+  createdPopups.clear();
+  finalTriggered = true;
+}
+
+/* ========== 事件绑定 ========== */
+startBtn.addEventListener('click', async () => {
+  if (IMAGE_URLS.length) {
+    await preloadImages(IMAGE_URLS);
+  }
+  startAll();
+});
+toggleBtn.addEventListener('click', ()=> toggleRunning());
+stopBtn.addEventListener('click', ()=> stopAll());
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') { e.preventDefault(); toggleRunning(); }
+  if (e.code === 'Escape') { e.preventDefault(); stopAll(); }
+});
+
+/* ========== 进度条拖动控制 ========== */
+progressWrap.addEventListener('click', e => {
+  if (!audio || !audio.duration) return;
+  const rect = progressWrap.getBoundingClientRect();
+  const pct = Math.min(1, Math.max(0,(e.clientX-rect.left)/rect.width));
+  audio.currentTime = pct * audio.duration;
+  popupTimeCache.clear();
+});
+</script>
+</body>
+</html>
