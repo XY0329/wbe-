@@ -500,18 +500,20 @@ function finalizeExit() {
 function updateProgress() {
   if (!audio || !audioStarted) {
     progressBarEl.style.width = '0%';
-    timeLabel.innerText = `00:00 / ${formatTime(stages[stages.length-1].end)}`;
+    timeLabel.innerText = `00:00 / 00:00`;
     requestAnimationFrame(updateProgress);
     return;
   }
-  const pos_s = audio.currentTime + START_OFFSET;
-  const total = stages[stages.length-1].end;
-  const rate = Math.min(1, pos_s / total);
+
+  const pos_s = audio.currentTime;
+  const total = audio.duration || 0; // 用音频本身的长度
+  const rate = total ? Math.min(1, pos_s / total) : 0;
+
   progressBarEl.style.width = `${(rate*100).toFixed(2)}%`;
   timeLabel.innerText = `${formatTime(pos_s)} / ${formatTime(total)}`;
+
   requestAnimationFrame(updateProgress);
 }
-
 /* ========== 控制：开始 / 暂停 / 停止 ========== */
 function startAll() {
   if (!MUSIC_URL) {
@@ -593,4 +595,5 @@ progressWrap.addEventListener('click', e => {
 </script>
 </body>
 </html>
+
 
